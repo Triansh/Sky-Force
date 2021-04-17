@@ -5,29 +5,40 @@ import * as dat from 'dat.gui';
 
 import Floor from './js/Floor';
 import Keyboard from './js/Keyboard';
+import MissileLauncher from './js/Missile';
 
 import { makeLines } from './js/makeLines';
+
+import skyImage from '../assets/images/sky.jpg';
+import ObstacleController from './js/ObstacleController';
+import ScoreController from './js/ScoreController';
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
-const camera = new THREE.PerspectiveCamera(10, window.innerWidth / window.innerHeight, 1, 1000);
+const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 1000);
 const scene = new THREE.Scene();
 const controls = new OrbitControls(camera, renderer.domElement);
 const keyboard = new Keyboard();
+const missileLauncher = new MissileLauncher();
+const obstacleController = new ObstacleController();
+const scoreController = new ScoreController();
 
 let plane;
-let missiles = [];
-let obstacles = [];
-let colliders = [];
+
+const YPos = 8;
 
 function init() {
-    scene.background = new THREE.Color('black');
-    scene.fog = new THREE.FogExp2('#ccff', 0.003);
-    camera.position.set(300, 100, 0);
+    const loader = new THREE.CubeTextureLoader();
+    const texture = loader.load([skyImage, skyImage, skyImage, skyImage, skyImage, skyImage]);
+    texture.encoding = THREE.sRGBEncoding;
+    scene.background = texture;
+    scene.fog = new THREE.FogExp2('#ccff', 0.004);
+    camera.position.set(-30, 10, -10);
     camera.lookAt(0, 0, 0);
     const floor = new Floor(10000, '#336633');
     scene.add(floor.mesh);
+    window.addEventListener('resize', onWindowResize);
 }
 
 function setLight() {
@@ -48,29 +59,40 @@ function setupControls() {
 }
 
 function loadGLTF() {
-    let balloonLoader = new GLTFLoader();
+    let planeLoader = new GLTFLoader();
 
-    balloonLoader.load('/models/plane.glb', gltf => {
+    planeLoader.load('/models/plane.glb', gltf => {
         plane = gltf.scene;
         plane.scale.set(0.2, 0.2, 0.2);
         scene.add(plane);
         plane.position.x = 0;
-        plane.position.y = 0;
+        plane.position.y = YPos;
         plane.position.z = 0;
         makeLines(scene, plane.position);
+        obstacleController.add(scene, plane.position.clone());
         make_gui();
     });
 }
 
+function make_tpp() {
+    if (!plane) return;
+    const offset = new THREE.Vector3(-6, YPos - 2, -15);
+    offset.applyQuaternion(plane.quaternion);
+    offset.add(plane.position);
+
+    const lookAt = new THREE.Vector3(0, 3, 10);
+    lookAt.applyQuaternion(plane.quaternion);
+    lookAt.add(plane.position);
+
+    camera.position.copy(offset);
+    camera.lookAt(lookAt);
+}
+
 function animate() {
     requestAnimationFrame(animate);
-    // if (plane && plane.rotation) {
-    //     // plane.rotation.y -= 0.005;
-    // }
-    // console.log(Mesh.position);
+    update();
+    make_tpp();
     camera.position.y = Math.max(10, camera.position.y);
-    move();
-    moveMissiles();
     camera.updateProjectionMatrix();
     renderer.render(scene, camera);
 }
@@ -78,51 +100,74 @@ function animate() {
 function move() {
     if (!plane) return;
     const controlObject = plane;
+
+    const _Q = new THREE.Quaternion();
+    const _A = new THREE.Vector3();
+    const _R = controlObject.quaternion.clone();
+    const velocity = new THREE.Vector3(0.0, 0.0, 0.0);
+    const speed = 10;
+    let sideMovement = 0;
     // let planeGui = 0;
     if (keyboard.keys[38]) {
         // velocity += speed;
-        controlObject.position.x += 1;
-        camera.position.x += 1;
+        velocity.z += speed;
+        // camera.position.x += velocity.z;
     }
     if (keyboard.keys[40]) {
         // velocity -= speed;
-        controlObject.position.x -= 1;
-        camera.position.x -= 1;
+        velocity.z -= speed;
+        // camera.position.x -= velocity.z;
+    }
+    if (keyboard.keys[65]) {
+        _A.set(0, 1, 0);
+        _Q.setFromAxisAngle(_A, 4.0 * Math.PI * 0.001);
+        _R.multiply(_Q);
+    }
+    if (keyboard.keys[68]) {
+        _A.set(0, 1, 0);
+        _Q.setFromAxisAngle(_A, -4.0 * Math.PI * 0.001);
+        _R.multiply(_Q);
     }
     if (keyboard.keys[37]) {
-        controlObject.position.z -= 1;
-        camera.position.z -= 1;
+        sideMovement = -1;
+        velocity.z += speed;
     }
     if (keyboard.keys[39]) {
-        controlObject.position.z += 1;
-        camera.position.z += 1;
+        sideMovement = 1;
+        velocity.z += speed;
     }
 
-    if (keyboard.keys[65]) {
-        create_missiles();
-        keyboard.keys[65] = false;
+    controlObject.quaternion.copy(_R);
+
+    const oldPosition = new THREE.Vector3();
+    oldPosition.copy(controlObject.position);
+
+    const forward = new THREE.Vector3(0, 0, 1);
+    forward.applyQuaternion(controlObject.quaternion);
+    if (sideMovement) forward.cross(new THREE.Vector3(0, 1 * sideMovement, 0));
+    forward.normalize();
+
+    const sideways = new THREE.Vector3(1, 0, 0);
+    sideways.applyQuaternion(controlObject.quaternion);
+    sideways.normalize();
+
+    sideways.multiplyScalar(velocity.x * 0.05);
+    forward.multiplyScalar(velocity.z * 0.05);
+
+    controlObject.position.add(forward);
+    controlObject.position.add(sideways);
+
+    if (keyboard.keys[32]) {
+        if (plane) missileLauncher.add(scene, plane.position, plane.quaternion);
+        keyboard.keys[32] = false;
     }
+
     plane.position.copy(controlObject.position);
-    camera.lookAt(plane.position);
+    // camera.lookAt(plane.position);
 }
-
-function moveMissiles() {
-    const to_remove = [];
-    for (let i = 0; i < missiles.length; i++) {
-        if (detectCollisions(missiles[i])) {
-            scene.remove(missiles[i]);
-            to_remove.push(missiles[i]);
-        } else {
-            missiles[i].position.x -= 1.5;
-        }
-    }
-
-    missiles = missiles.filter(m => !to_remove.includes(m));
-}
-
-const maxi = 200;
 
 function make_gui() {
+    const maxi = 200;
     var gui = new dat.GUI();
 
     var cam = gui.addFolder('Camera');
@@ -141,54 +186,8 @@ function make_gui() {
     planeGui.open();
 }
 
-function createObs() {
-    const characterSize = 5;
-    var geometry = new THREE.BoxGeometry(characterSize, characterSize, characterSize);
-    var material = new THREE.MeshPhongMaterial({ color: 0xff00ff });
-    const ob = new THREE.Mesh(geometry, material);
-    ob.position.set(
-        Math.round(Math.random() * 100),
-        characterSize / 2,
-        Math.round(Math.random() * 100)
-    );
-    scene.add(ob);
-    obstacles = [...obstacles, ob];
-    calculateCollisionPoints(ob);
-}
-
-function create_missiles() {
-    if (plane) {
-        const size = 3;
-        var geometry = new THREE.BoxGeometry(size, size, size);
-        var material = new THREE.MeshPhongMaterial({ color: 0x0000ff });
-        const ob = new THREE.Mesh(geometry, material);
-        ob.position.x = plane.position.x;
-        ob.position.y = plane.position.y;
-        ob.position.z = plane.position.z + 2;
-        const ob2 = ob.clone();
-        ob2.position.z -= 2 * 2;
-        scene.add(ob);
-        scene.add(ob2);
-        missiles = [...missiles, ob, ob2];
-    }
-}
-
-function calculateCollisionPoints(mesh) {
-    var bbox = new THREE.Box3().setFromObject(mesh);
-    var bounds = {
-        xMin: bbox.min.x,
-        xMax: bbox.max.x,
-        yMin: bbox.min.y,
-        yMax: bbox.max.y,
-        zMin: bbox.min.z,
-        zMax: bbox.max.z,
-    };
-    colliders.push(bounds);
-}
-
-function detectCollisions(mesh) {
-    // Get the user's current collision area.
-    var bounds = {
+function getBounds(mesh) {
+    return {
         xMax: mesh.position.x - mesh.geometry.parameters.width / 2,
         xMin: mesh.position.x + mesh.geometry.parameters.width / 2,
         yMin: mesh.position.y - mesh.geometry.parameters.height / 2,
@@ -196,29 +195,58 @@ function detectCollisions(mesh) {
         zMin: mesh.position.z - mesh.geometry.parameters.width / 2,
         zMax: mesh.position.z + mesh.geometry.parameters.width / 2,
     };
+}
 
-    // Run through each object and detect if there is a collision.
-    for (var index = 0; index < colliders.length; index++) {
-        if (
-            bounds.xMin <= colliders[index].xMax &&
-            bounds.xMax >= colliders[index].xMin &&
-            bounds.yMin <= colliders[index].yMax &&
-            bounds.yMax >= colliders[index].yMin &&
-            bounds.zMin <= colliders[index].zMax &&
-            bounds.zMax >= colliders[index].zMin
-        ) {
-            return true;
-        }
-    }
+function detectCollisions(objectMesh, colliderMesh) {
+    const objBounds = getBounds(objectMesh);
+    var bbox = new THREE.Box3().setFromObject(colliderMesh);
+    if (
+        objBounds.xMin <= bbox.max.x &&
+        objBounds.yMin <= bbox.max.y &&
+        objBounds.zMin <= bbox.max.z &&
+        objBounds.xMax >= bbox.min.x &&
+        objBounds.yMax >= bbox.min.y &&
+        objBounds.zMax >= bbox.min.z
+    )
+        return true;
+
     return false;
+}
+
+function update() {
+    if (plane) obstacleController.update(plane.position.clone());
+    move();
+    missileLauncher.move();
+    const to_remove_missiles = [];
+    const to_remove_obstacles = [];
+    for (let i = 0; i < missileLauncher.missiles.length; i++) {
+        const missile = missileLauncher.missiles[i];
+        let collided = false;
+        for (let j = 0; j < obstacleController.obstacles.length; j++) {
+            const obs = obstacleController.obstacles[j];
+            if (detectCollisions(missile.object, obs)) {
+                scoreController.addStar(scene, obs.position.clone());
+                scene.remove(missile.object);
+                scene.remove(obs);
+                to_remove_missiles.push(missile);
+                to_remove_obstacles.push(obs);
+                collided = true;
+                break;
+            }
+        }
+        if (!collided) missile.object.position.add(missile.forward);
+    }
+    missileLauncher.remove(to_remove_missiles);
+    obstacleController.remove(to_remove_obstacles);
+}
+
+function onWindowResize() {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.render(scene, camera);
 }
 
 init();
 setLight();
 loadGLTF();
 animate();
-createObs();
-createObs();
-createObs();
-createObs();
-createObs();

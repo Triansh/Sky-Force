@@ -8,10 +8,38 @@
         body {
             margin: 0;
             padding: 0;
+            position: relative;
+            font-size: 62.5%;
+        }
+
+        .score-board {
+            margin: .7rem;
+            position: absolute;
+            top: 0;
+            left: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .score-board-heading {
+            margin: .5rem;
+        }
+
+        .score-board-heading,
+        .score {
+            font-size: 1.5rem;
+            color: #fff;
         }
     </style>
 </head>
 
-<body></body>
+<body>
+    <div class="score-board">
+        <h2 class="score-board-heading">SCORE :</h2>
+        <h2 class="score">0</h2>
+    </div>
+
+</body>
 
 </html>
