@@ -16,7 +16,7 @@ class ObstacleController {
 
     createObs(scene, pos, color = '#ff00ff') {
         const characterSize = 5;
-        const factor = 250;
+        const factor = 150;
         var geometry = new THREE.BoxGeometry(characterSize, characterSize, characterSize);
         var material = new THREE.MeshPhongMaterial({ color });
         const ob = new THREE.Mesh(geometry, material);

@@ -9,7 +9,8 @@ import MissileLauncher from './js/Missile';
 
 import { makeLines } from './js/makeLines';
 
-import skyImage from '../assets/images/sky.jpg';
+import skyImage from '/assets/images/sky.jpg';
+import skyImage2 from '/assets/images/sky2.jpg';
 import ObstacleController from './js/ObstacleController';
 import ScoreController from './js/ScoreController';
 
@@ -29,8 +30,17 @@ let plane;
 const YPos = 8;
 
 function init() {
-    const loader = new THREE.CubeTextureLoader();
-    const texture = loader.load([skyImage, skyImage, skyImage, skyImage, skyImage, skyImage]);
+    const loader = new THREE.TextureLoader();
+    const texture = loader.load(
+        skyImage2,
+        
+        // '/assets/images/sky.jpg',
+        // '/assets/images/sky.jpg',
+        // '/assets/images/sky.jpg',
+        // '/assets/images/sky.jpg',
+        // '/assets/images/sky.jpg',
+        // '/assets/images/sky.jpg',
+    );
     texture.encoding = THREE.sRGBEncoding;
     scene.background = texture;
     scene.fog = new THREE.FogExp2('#ccff', 0.004);
@@ -39,6 +49,7 @@ function init() {
     const floor = new Floor(10000, '#336633');
     scene.add(floor.mesh);
     window.addEventListener('resize', onWindowResize);
+    setupControls();
 }
 
 function setLight() {
@@ -61,7 +72,7 @@ function setupControls() {
 function loadGLTF() {
     let planeLoader = new GLTFLoader();
 
-    planeLoader.load('/models/plane.glb', gltf => {
+    planeLoader.load('/assets/models/toyPlane.glb', gltf => {
         plane = gltf.scene;
         plane.scale.set(0.2, 0.2, 0.2);
         scene.add(plane);
@@ -69,7 +80,9 @@ function loadGLTF() {
         plane.position.y = YPos;
         plane.position.z = 0;
         makeLines(scene, plane.position);
+        plane.scale.multiplyScalar(10)
         obstacleController.add(scene, plane.position.clone());
+        console.log(plane);
         make_gui();
     });
 }
@@ -91,7 +104,7 @@ function make_tpp() {
 function animate() {
     requestAnimationFrame(animate);
     update();
-    make_tpp();
+    // make_tpp();
     camera.position.y = Math.max(10, camera.position.y);
     camera.updateProjectionMatrix();
     renderer.render(scene, camera);
@@ -186,27 +199,16 @@ function make_gui() {
     planeGui.open();
 }
 
-function getBounds(mesh) {
-    return {
-        xMax: mesh.position.x - mesh.geometry.parameters.width / 2,
-        xMin: mesh.position.x + mesh.geometry.parameters.width / 2,
-        yMin: mesh.position.y - mesh.geometry.parameters.height / 2,
-        yMax: mesh.position.y + mesh.geometry.parameters.height / 2,
-        zMin: mesh.position.z - mesh.geometry.parameters.width / 2,
-        zMax: mesh.position.z + mesh.geometry.parameters.width / 2,
-    };
-}
-
 function detectCollisions(objectMesh, colliderMesh) {
-    const objBounds = getBounds(objectMesh);
-    var bbox = new THREE.Box3().setFromObject(colliderMesh);
+    const objBounds = new THREE.Box3().setFromObject(objectMesh);
+    const colliderBounds = new THREE.Box3().setFromObject(colliderMesh);
     if (
-        objBounds.xMin <= bbox.max.x &&
-        objBounds.yMin <= bbox.max.y &&
-        objBounds.zMin <= bbox.max.z &&
-        objBounds.xMax >= bbox.min.x &&
-        objBounds.yMax >= bbox.min.y &&
-        objBounds.zMax >= bbox.min.z
+        objBounds.min.x <= colliderBounds.max.x &&
+        objBounds.min.y <= colliderBounds.max.y &&
+        objBounds.min.z <= colliderBounds.max.z &&
+        objBounds.max.x >= colliderBounds.min.x &&
+        objBounds.max.y >= colliderBounds.min.y &&
+        objBounds.max.z >= colliderBounds.min.z
     )
         return true;
 
@@ -238,6 +240,18 @@ function update() {
     }
     missileLauncher.remove(to_remove_missiles);
     obstacleController.remove(to_remove_obstacles);
+
+    if (plane) {
+        const to_remove_stars = [];
+        for (let i = 0; i < scoreController.stars.length; i++) {
+            const star = scoreController.stars[i];
+            if (detectCollisions(star, plane)) {
+                scene.remove(star);
+                to_remove_stars.push(star);
+            }
+        }
+        scoreController.remove(to_remove_stars);
+    }
 }
 
 function onWindowResize() {

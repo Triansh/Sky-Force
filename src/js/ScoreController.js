@@ -20,7 +20,7 @@ class ScoreController {
     remove(to_remove) {
         this.score += this.scoreFactor * to_remove.length;
         document.querySelector('.score').innerHTML = this.score.toString();
-        this.obstacles = this.obstacles.filter(m => !to_remove.includes(m));
+        this.stars = this.stars.filter(m => !to_remove.includes(m));
     }
 }
 
