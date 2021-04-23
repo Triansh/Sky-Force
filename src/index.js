@@ -1,18 +1,15 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
-import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import * as dat from 'dat.gui';
 
 import Floor from './js/Floor';
 import Keyboard from './js/Keyboard';
 import MissileLauncher from './js/MissileLauncher';
-import { FSM, AnimatedObject } from './js/FSM';
+import { AnimatedObject } from './js/FSM';
 
 import { makeLines } from './js/makeLines';
 
-// import skyImage from '/assets/images/sky.jpg';
-// import skyImage2 from '/assets/images/sky2.jpg';
 import ObstacleController from './js/ObstacleController';
 import ScoreController from './js/ScoreController';
 import {
@@ -47,8 +44,6 @@ const scoreController = new ScoreController();
 
 let plane;
 let prevTime = null;
-let planeMixer;
-const animations = {};
 let planeAnimator;
 
 // Audio
@@ -66,22 +61,7 @@ audioLoader.load('/assets/audio/plane.mp3', function (buffer) {
 const YPos = 8;
 
 function init() {
-    const cubetexture = new THREE.TextureLoader().setPath('/assets/images/poly/').load(
-        // [
-        '1.png',
-        // '2.png',
-        // '3.jpg',
-        // '4.png',
-        // '5.jpg',
-        // '4.png',
-        //'negx.jpg', 'posy.jpg', 'negy.jpg', 'posz.jpg', 'negz.jpg'], () => {
-        // ],
-        () => {
-            cubetexture.encoding = THREE.sRGBEncoding;
-            scene.background = cubetexture;
-            renderer.render(scene, camera);
-        }
-    );
+    const cubetexture = new THREE.TextureLoader().setPath('/assets/images/poly/').load('1.png');
     scene.background = cubetexture;
     scene.fog = new THREE.FogExp2('#ccff', 0.004);
     camera.add(listener);
@@ -96,10 +76,6 @@ function init() {
 function setLight() {
     let l = new THREE.AmbientLight(0xffffff, 2);
     scene.add(l);
-    // const light = new THREE.PointLight(0xffffff, 1); // soft white light
-    // light.position.set(100, 100, 100).normalize();
-    // light.lookAt(0, 0, 0);
-    // scene.add(light);
 }
 
 function setupControls() {
@@ -139,7 +115,7 @@ function loadGLTF() {
     });
 }
 
-function make_tpp() {
+function make_tpp(timeElapsed) {
     if (!plane) return;
     const offset = new THREE.Vector3(1, 10, -23);
     offset.applyQuaternion(plane.quaternion);
@@ -148,6 +124,10 @@ function make_tpp() {
     const lookAt = new THREE.Vector3(0, 0, 10);
     lookAt.applyQuaternion(plane.quaternion);
     lookAt.add(plane.position);
+
+    const t = 1.0 - Math.pow(0.001, timeElapsed);
+    offset.lerp(offset, t);
+    lookAt.lerp(lookAt, t);
 
     camera.position.copy(offset);
     camera.lookAt(lookAt);
@@ -158,10 +138,11 @@ function animate() {
         if (!prevTime) prevTime = t;
 
         animate();
-        if (planeAnimator) planeAnimator.update((t - prevTime) * 0.001, keyboard.keys);
+        const timeElapsed = (t - prevTime) * 0.001;
+        if (planeAnimator) planeAnimator.update(timeElapsed, keyboard.keys);
 
         update();
-        make_tpp();
+        make_tpp(timeElapsed);
         camera.position.y = Math.max(10, camera.position.y);
         camera.updateProjectionMatrix();
         renderer.render(scene, camera);
@@ -179,12 +160,9 @@ function move() {
     const velocity = new THREE.Vector3(0.0, 0.0, 0.0);
     const speed = 10;
     let sideMovement = 0;
-    if (keyboard.keys[KEY_FORWARD]) {
-        velocity.z += speed;
-    }
-    if (keyboard.keys[KEY_BACKWARD]) {
-        velocity.z -= speed;
-    }
+    if (keyboard.keys[KEY_FORWARD]) velocity.z += speed;
+    if (keyboard.keys[KEY_BACKWARD]) velocity.z -= speed;
+
     if (keyboard.keys[KEY_TURN_LEFT]) {
         _A.set(0, 1, 0);
         _Q.setFromAxisAngle(_A, Math.PI * 0.01);
@@ -205,15 +183,11 @@ function move() {
     }
 
     if (planeAnimator) {
-        if (keyboard.keys[KEY_RIGHT]) {
-            planeAnimator.setState('right');
-        } else if (keyboard.keys[KEY_LEFT]) {
-            planeAnimator.setState('left');
-        }
+        if (keyboard.keys[KEY_RIGHT]) planeAnimator.setState('right');
+        else if (keyboard.keys[KEY_LEFT]) planeAnimator.setState('left');
     }
 
     controlObject.quaternion.copy(_R);
-
     const oldPosition = new THREE.Vector3();
     oldPosition.copy(controlObject.position);
 
@@ -221,45 +195,21 @@ function move() {
     forward.applyQuaternion(controlObject.quaternion);
     if (sideMovement) forward.cross(new THREE.Vector3(0, 1 * sideMovement, 0));
     forward.normalize();
+    forward.multiplyScalar(velocity.z * 0.08);
 
     const sideways = new THREE.Vector3(1, 0, 0);
     sideways.applyQuaternion(controlObject.quaternion);
     sideways.normalize();
-
     sideways.multiplyScalar(velocity.x * 0.08);
-    forward.multiplyScalar(velocity.z * 0.08);
 
     controlObject.position.add(forward);
     controlObject.position.add(sideways);
+    plane.position.copy(controlObject.position);
 
     if (keyboard.keys[KEY_SHOOT]) {
         if (plane) missileLauncher.add(scene, plane.position, plane.quaternion);
         keyboard.keys[KEY_SHOOT] = false;
     }
-    // console.log(plane.quaternion)
-
-    plane.position.copy(controlObject.position);
-    // camera.lookAt(plane.position);
-}
-
-function make_gui() {
-    const maxi = 200;
-    var gui = new dat.GUI();
-
-    var cam = gui.addFolder('Camera');
-    cam.add(camera.position, 'x', -maxi, maxi).listen();
-    cam.add(camera.position, 'y', -maxi, maxi).listen();
-    cam.add(camera.position, 'z', -maxi, maxi).listen();
-    cam.open();
-
-    var planeGui = gui.addFolder('Plane');
-    planeGui.add(plane.position, 'x', -10, 10).listen();
-    planeGui.add(plane.position, 'y', -10, 10).listen();
-    planeGui.add(plane.position, 'z', -10, 10).listen();
-    planeGui.add(plane.scale, 'x', -10, 10).listen();
-    planeGui.add(plane.scale, 'y', -10, 10).listen();
-    planeGui.add(plane.scale, 'z', -10, 10).listen();
-    planeGui.open();
 }
 
 function detectCollisions(objectMesh, colliderMesh) {
@@ -274,12 +224,10 @@ function detectCollisions(objectMesh, colliderMesh) {
         objBounds.max.z >= colliderBounds.min.z
     )
         return true;
-
     return false;
 }
 
 function update() {
-    // stateMachine.Update(0.0005, null);
     if (plane) obstacleController.update(plane.position.clone());
     move();
     missileLauncher.move();
@@ -322,6 +270,26 @@ function onWindowResize() {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+function make_gui() {
+    const maxi = 200;
+    var gui = new dat.GUI();
+
+    var cam = gui.addFolder('Camera');
+    cam.add(camera.position, 'x', -maxi, maxi).listen();
+    cam.add(camera.position, 'y', -maxi, maxi).listen();
+    cam.add(camera.position, 'z', -maxi, maxi).listen();
+    cam.open();
+
+    var planeGui = gui.addFolder('Plane');
+    planeGui.add(plane.position, 'x', -10, 10).listen();
+    planeGui.add(plane.position, 'y', -10, 10).listen();
+    planeGui.add(plane.position, 'z', -10, 10).listen();
+    planeGui.add(plane.scale, 'x', -10, 10).listen();
+    planeGui.add(plane.scale, 'y', -10, 10).listen();
+    planeGui.add(plane.scale, 'z', -10, 10).listen();
+    planeGui.open();
 }
 
 init();

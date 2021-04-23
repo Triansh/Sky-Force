@@ -9,27 +9,27 @@ class ObstacleController {
     }
 
     add(scene, position) {
-        const cnt = Math.floor(Math.random() * 20);
-        console.log(cnt);
+        const cnt = Math.floor(Math.random() * 10);
         for (let i = 0; i < cnt; i++) {
-            this.createObs(scene, position);
+            this.obstacleLoader.setPath('/assets/models/').load('airbomb.glb', gltf => {
+                const ob = gltf.scene;
+                scene.add(ob);
+                this.createObs(ob, position);
+            });
         }
     }
 
-    createObs(scene, pos, color = '#ff00ff') {
-        this.obstacleLoader.setPath('/assets/models/').load('airbomb.glb', gltf => {
-            const ob = gltf.scene;
-            scene.add(ob);
-
-            const factor = 100;
-            const minusX = Math.random() < 0.5;
-            pos.x += factor / 3 + Math.round(Math.random() * factor);
-            pos.z += factor / 3 + Math.round(Math.random() * factor);
-            pos.x = (minusX ? -1 : 1) * pos.x;
-            ob.position.set(pos.x, pos.y, pos.z);
-            ob.scale.multiplyScalar(1.3);
-            this.obstacles = [...this.obstacles, ob];
-        });
+    createObs(ob, position) {
+        const factor = 80;
+        const minusX = Math.random() < 0.5;
+        const pos = position.clone();
+        pos.x += factor / 3 + Math.round(Math.random() * factor);
+        pos.z += factor / 3 + Math.round(Math.random() * factor);
+        pos.x = (minusX ? -1 : 1) * pos.x;
+        ob.position.set(pos.x, pos.y, pos.z);
+        ob.rotation.set(0, Math.PI, 0);
+        ob.scale.multiplyScalar(1.2);
+        this.obstacles = [...this.obstacles, ob];
     }
 
     update(pos) {

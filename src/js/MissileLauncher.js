@@ -6,7 +6,6 @@ class MissileLauncher {
         this.missiles = []; // {object: '', forward}
         this.speed = 0.8;
         this.missileLoader = new GLTFLoader();
-        
     }
 
     move(missile) {
@@ -15,8 +14,6 @@ class MissileLauncher {
             m.object.position.add(m.forward);
         }
     }
-
-    // get mis
 
     remove(to_remove) {
         this.missiles = this.missiles.filter(m => !to_remove.includes(m));
@@ -32,7 +29,7 @@ class MissileLauncher {
         side.normalize();
         side.multiplyScalar(1.3);
 
-        this.missileLoader.setPath('/assets/models/').load('missile.gltf', gltf => {
+        this.missileLoader.setPath('/assets/models/').load('missile.glb', gltf => {
             const ob = gltf.scene;
             ob.scale.multiplyScalar(0.5);
             ob.applyQuaternion(quaternion);
@@ -45,18 +42,7 @@ class MissileLauncher {
             scene.add(ob);
             scene.add(ob2);
             this.missiles = [...this.missiles, { object: ob, forward }, { object: ob2, forward }];
-            // missile.rotation.y = (Math.PI / 2) * 0.25;
-            // obstacleController.add(scene, model.position.clone());
-            // console.log(model);
         });
-        // const size = 0.5;
-        // const geometry = new THREE.BoxGeometry(size, size, size);
-        // const material = new THREE.MeshPhongMaterial({ color: 0x0000ff });
-        // const ob = new THREE.Mesh(geometry, material);
-        // ob.position.copy(position);
-        // ob.position.add(side);
-
-        // this.missiles = [...this.missiles, { object: ob, forward }, { object: ob2, forward }];
     }
 }
 export default MissileLauncher;

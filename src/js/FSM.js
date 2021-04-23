@@ -3,7 +3,7 @@ import { KEY_RIGHT, KEY_LEFT } from './keys';
 
 export class FiniteStateMachine {
     constructor(object) {
-        this.states = {}; // state(name) : {Parent, animations{clips, action}}
+        this.states = {}; // state(name) : {State}
         this.curState = null;
         this.mixer = new AnimationMixer(object);
     }
@@ -75,10 +75,8 @@ export class State {
             curAction.setEffectiveWeight(1.0);
             if (!prevState.global) curAction.crossFadeFrom(prevAction, 0.5, true);
         }
-        // for (let i = 0; i < this.animations.length; i++) {
         console.log(this.name);
         curAction.play();
-        // }
     }
     Update() {}
 }
