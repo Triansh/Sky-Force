@@ -1,4 +1,5 @@
 import { AnimationMixer } from 'three';
+import { KEY_RIGHT, KEY_LEFT } from './keys';
 
 export class FiniteStateMachine {
     constructor(object) {
@@ -18,16 +19,21 @@ export class FiniteStateMachine {
         }
 
         const state = this.states[name];
-        console.log(name, this.states, state);
-
         this.curState = state;
         this.curState.Enter(prevState);
     }
 
-    update(timeElapsed) {
+    update(timeElapsed, keys) {
         this.mixer.update(timeElapsed);
         if (this.curState) {
-            this.curState.Update(timeElapsed);
+            this.curState.Update();
+            if (
+                (this.curState.name == 'right' && !keys[KEY_RIGHT]) ||
+                (this.curState.name == 'left' && !keys[KEY_LEFT])
+            ) {
+                this.curState.animations.action.fadeOut(0.8);
+                this.curState = this.states['idle'];
+            }
         }
     }
 }
@@ -70,49 +76,9 @@ export class State {
             if (!prevState.global) curAction.crossFadeFrom(prevAction, 0.5, true);
         }
         // for (let i = 0; i < this.animations.length; i++) {
+        console.log(this.name);
         curAction.play();
         // }
     }
     Update() {}
 }
-
-// export class IdleState extends State {
-//     constructor(parent) {
-//         super(parent);
-//     }
-
-//     get Name() {
-//         return 'idle';
-//     }
-
-//     Enter(prevState) {
-//         const idleAction = this.parent._animations['idle'].action;
-//         console.log(this.parent);
-//         console.log(this.parent.proxy, this.parent.proxy._animations);
-//         console.log(idleAction);
-//         if (prevState) {
-//             const prevAction = this.parent.proxy._animations[prevState.Name].action;
-//             idleAction.time = 0.0;
-//             idleAction.enabled = true;
-//             idleAction.setEffectiveTimeScale(1.0);
-//             idleAction.setEffectiveWeight(1.0);
-//             idleAction.crossFadeFrom(prevAction, 0.5, true);
-//             idleAction.play();
-//         } else {
-//             // console.log('Action', action);
-//             idleAction.play();
-//             console.log(idleAction.play);
-//         }
-//     }
-
-//     Exit() {}
-
-//     Update(keys) {
-//         // Change state here
-//         if (keys || input._keys.backward) {
-//             this.parent.setState('walk');
-//         } else if (input._keys.space) {
-//             this.parent.setState('dance');
-//         }
-//     }
-// }

@@ -1,9 +1,11 @@
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
 
 class ObstacleController {
     constructor() {
         this.obstacles = [];
         this.speed = 0.1;
+        this.obstacleLoader = new GLTFLoader();
     }
 
     add(scene, position) {
@@ -15,23 +17,19 @@ class ObstacleController {
     }
 
     createObs(scene, pos, color = '#ff00ff') {
-        const characterSize = 5;
-        const factor = 150;
-        var geometry = new THREE.BoxGeometry(characterSize, characterSize, characterSize);
-        var material = new THREE.MeshPhongMaterial({ color });
-        const ob = new THREE.Mesh(geometry, material);
+        this.obstacleLoader.setPath('/assets/models/').load('airbomb.glb', gltf => {
+            const ob = gltf.scene;
+            scene.add(ob);
 
-        const minusX = Math.random() < 0.5;
-        const minusZ = Math.random() <= 0.5;
-        pos.x += Math.round(Math.random() * factor);
-        pos.z += Math.round(Math.random() * factor);
-        pos.x = (minusX ? -1 : 1) * pos.x;
-        pos.z = (minusZ ? -1 : 1) * pos.z;
-
-        ob.position.set(pos.x, characterSize / 2 + pos.y, pos.z);
-
-        scene.add(ob);
-        this.obstacles = [...this.obstacles, ob];
+            const factor = 100;
+            const minusX = Math.random() < 0.5;
+            pos.x += factor / 3 + Math.round(Math.random() * factor);
+            pos.z += factor / 3 + Math.round(Math.random() * factor);
+            pos.x = (minusX ? -1 : 1) * pos.x;
+            ob.position.set(pos.x, pos.y, pos.z);
+            ob.scale.multiplyScalar(1.3);
+            this.obstacles = [...this.obstacles, ob];
+        });
     }
 
     update(pos) {

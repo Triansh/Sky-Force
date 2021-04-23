@@ -6,7 +6,7 @@ import * as dat from 'dat.gui';
 
 import Floor from './js/Floor';
 import Keyboard from './js/Keyboard';
-import MissileLauncher from './js/Missile';
+import MissileLauncher from './js/MissileLauncher';
 import { FSM, AnimatedObject } from './js/FSM';
 
 import { makeLines } from './js/makeLines';
@@ -90,6 +90,7 @@ function init() {
     const floor = new Floor(10000, '#336633');
     scene.add(floor.mesh);
     setupControls();
+    obstacleController.add(scene, new THREE.Vector3(0, 8, -75));
 }
 
 function setLight() {
@@ -118,8 +119,6 @@ function loadGLTF() {
         plane.position.set(0, 8, -75);
         makeLines(scene, plane.position);
         plane.scale.multiplyScalar(2);
-        obstacleController.add(scene, plane.position.clone());
-
         plane.add(sound1);
 
         planeAnimator = new AnimatedObject(plane);
@@ -131,35 +130,11 @@ function loadGLTF() {
             planeAnimator.addAnimation(name, anim, global);
 
         animationLoader.load('toyPlane.glb', gltf => {
-            onLoad('right', gltf.animations[0]);
-            onLoad('idle', gltf.animations[1], true);
+            onLoad('left', gltf.animations[1]);
+            onLoad('right', gltf.animations[2]);
+            onLoad('idle', gltf.animations[0], true);
+            onLoad('propel', gltf.animations[3], true);
         });
-
-        // const plan
-
-        // const manager = new THREE.LoadingManager();
-        // manager.onLoad = () => {
-        //     stateMachine.SetState('idle');
-        // };
-        // const onLoadingAnimation = (animName, anim) => {
-        //     const clip = anim.animations[0];
-        //     const action = planeMixer.clipAction(clip);
-
-        //     animations[animName] = {
-        //         clip: clip,
-        //         action: action,
-        //     };
-        // };
-
-        // const loader = new FBXLoader(manager);
-        // loader.setPath('/assets/models/');
-        // loader.load('plane.fbx', a => {
-        //     onLoadingAnimation('idle', a);
-        // });
-
-        //   loader.load('run.fbx', (a) => { _OnLoad('run', a); });
-        //   loader.load('idle.fbx', (a) => { _OnLoad('idle', a); });
-        //   loader.load('dance.fbx', (a) => { _OnLoad('dance', a); });
         make_gui();
     });
 }
@@ -183,7 +158,7 @@ function animate() {
         if (!prevTime) prevTime = t;
 
         animate();
-        if (planeAnimator) planeAnimator.update((t - prevTime) * 0.001);
+        if (planeAnimator) planeAnimator.update((t - prevTime) * 0.001, keyboard.keys);
 
         update();
         make_tpp();
@@ -204,25 +179,20 @@ function move() {
     const velocity = new THREE.Vector3(0.0, 0.0, 0.0);
     const speed = 10;
     let sideMovement = 0;
-    // let planeGui = 0;
     if (keyboard.keys[KEY_FORWARD]) {
-        // velocity += speed;
         velocity.z += speed;
-        // camera.position.x += velocity.z;
     }
     if (keyboard.keys[KEY_BACKWARD]) {
-        // velocity -= speed;
         velocity.z -= speed;
-        // camera.position.x -= velocity.z;
     }
     if (keyboard.keys[KEY_TURN_LEFT]) {
         _A.set(0, 1, 0);
-        _Q.setFromAxisAngle(_A, 4.0 * Math.PI * 0.001);
+        _Q.setFromAxisAngle(_A, Math.PI * 0.01);
         _R.multiply(_Q);
     }
     if (keyboard.keys[KEY_TURN_RIGHT]) {
         _A.set(0, 1, 0);
-        _Q.setFromAxisAngle(_A, -4.0 * Math.PI * 0.001);
+        _Q.setFromAxisAngle(_A, -Math.PI * 0.01);
         _R.multiply(_Q);
     }
     if (keyboard.keys[KEY_LEFT]) {
@@ -232,9 +202,14 @@ function move() {
     if (keyboard.keys[KEY_RIGHT]) {
         sideMovement = 1;
         velocity.z += speed;
-        planeAnimator.setState('right');
-    } else {
-        planeAnimator.setState('idle');
+    }
+
+    if (planeAnimator) {
+        if (keyboard.keys[KEY_RIGHT]) {
+            planeAnimator.setState('right');
+        } else if (keyboard.keys[KEY_LEFT]) {
+            planeAnimator.setState('left');
+        }
     }
 
     controlObject.quaternion.copy(_R);
@@ -261,6 +236,7 @@ function move() {
         if (plane) missileLauncher.add(scene, plane.position, plane.quaternion);
         keyboard.keys[KEY_SHOOT] = false;
     }
+    // console.log(plane.quaternion)
 
     plane.position.copy(controlObject.position);
     // camera.lookAt(plane.position);
