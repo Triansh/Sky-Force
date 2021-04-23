@@ -1,7 +1,6 @@
 class Keyboard {
   constructor() {
     this.keys = new Array(256).fill(false);
-    console.log(this.keys);
     window.addEventListener("keydown", (e) => this.onDocumentKeyDown(e), false);
     window.addEventListener("keyup", (e) => this.onDocumentKeyUp(e), false);
   }

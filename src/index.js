@@ -1,99 +1,176 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
+import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import * as dat from 'dat.gui';
 
 import Floor from './js/Floor';
 import Keyboard from './js/Keyboard';
 import MissileLauncher from './js/Missile';
+import { FSM, AnimatedObject } from './js/FSM';
 
 import { makeLines } from './js/makeLines';
 
-import skyImage from '/assets/images/sky.jpg';
-import skyImage2 from '/assets/images/sky2.jpg';
+// import skyImage from '/assets/images/sky.jpg';
+// import skyImage2 from '/assets/images/sky2.jpg';
 import ObstacleController from './js/ObstacleController';
 import ScoreController from './js/ScoreController';
+import {
+    KEY_BACKWARD,
+    KEY_FORWARD,
+    KEY_LEFT,
+    KEY_RIGHT,
+    KEY_SHOOT,
+    KEY_TURN_LEFT,
+    KEY_TURN_RIGHT,
+} from './js/keys';
 
+// Renderer
 const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.physicallyCorrectLights = false;
+renderer.outputEncoding = THREE.sRGBEncoding;
+renderer.setClearColor('#bffffd', 1);
+renderer.setPixelRatio(window.devicePixelRatio);
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
+
+// Camera, Scene , Controls
 const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 1, 1000);
 const scene = new THREE.Scene();
 const controls = new OrbitControls(camera, renderer.domElement);
+
+// Helper Classes
 const keyboard = new Keyboard();
 const missileLauncher = new MissileLauncher();
 const obstacleController = new ObstacleController();
 const scoreController = new ScoreController();
 
 let plane;
+let prevTime = null;
+let planeMixer;
+const animations = {};
+let planeAnimator;
+
+// Audio
+const listener = new THREE.AudioListener();
+const audioLoader = new THREE.AudioLoader();
+const sound1 = new THREE.PositionalAudio(listener);
+audioLoader.load('/assets/audio/plane.mp3', function (buffer) {
+    sound1.setBuffer(buffer);
+    sound1.setRefDistance(20);
+    sound1.setLoop(true);
+    sound1.setVolume(0.4);
+    // sound1.play();
+});
 
 const YPos = 8;
 
 function init() {
-    const loader = new THREE.TextureLoader();
-    const texture = loader.load(
-        skyImage2,
-        
-        // '/assets/images/sky.jpg',
-        // '/assets/images/sky.jpg',
-        // '/assets/images/sky.jpg',
-        // '/assets/images/sky.jpg',
-        // '/assets/images/sky.jpg',
-        // '/assets/images/sky.jpg',
+    const cubetexture = new THREE.TextureLoader().setPath('/assets/images/poly/').load(
+        // [
+        '1.png',
+        // '2.png',
+        // '3.jpg',
+        // '4.png',
+        // '5.jpg',
+        // '4.png',
+        //'negx.jpg', 'posy.jpg', 'negy.jpg', 'posz.jpg', 'negz.jpg'], () => {
+        // ],
+        () => {
+            cubetexture.encoding = THREE.sRGBEncoding;
+            scene.background = cubetexture;
+            renderer.render(scene, camera);
+        }
     );
-    texture.encoding = THREE.sRGBEncoding;
-    scene.background = texture;
+    scene.background = cubetexture;
     scene.fog = new THREE.FogExp2('#ccff', 0.004);
-    camera.position.set(-30, 10, -10);
-    camera.lookAt(0, 0, 0);
+    camera.add(listener);
+    camera.position.set(14, 22, -18);
+    camera.lookAt(9, YPos, 10);
     const floor = new Floor(10000, '#336633');
     scene.add(floor.mesh);
-    window.addEventListener('resize', onWindowResize);
     setupControls();
 }
 
 function setLight() {
     let l = new THREE.AmbientLight(0xffffff, 2);
     scene.add(l);
-    const light = new THREE.PointLight(0xffffff, 1); // soft white light
-    light.position.set(100, 100, 100).normalize();
-    light.lookAt(0, 0, 0);
-    scene.add(light);
+    // const light = new THREE.PointLight(0xffffff, 1); // soft white light
+    // light.position.set(100, 100, 100).normalize();
+    // light.lookAt(0, 0, 0);
+    // scene.add(light);
 }
 
 function setupControls() {
     controls.enablePan = true;
     controls.enableZoom = true;
     controls.maxDistance = 1000; // Set our max zoom out distance (mouse scroll)
-    controls.minDistance = 60; // Set our min zoom in distance (mouse scroll)
+    controls.minDistance = 10; // Set our min zoom in distance (mouse scroll)
     controls.target.copy(new THREE.Vector3(0, 0, 0));
 }
 
 function loadGLTF() {
-    let planeLoader = new GLTFLoader();
+    const planeLoader = new GLTFLoader();
 
     planeLoader.load('/assets/models/toyPlane.glb', gltf => {
         plane = gltf.scene;
-        plane.scale.set(0.2, 0.2, 0.2);
         scene.add(plane);
-        plane.position.x = 0;
-        plane.position.y = YPos;
-        plane.position.z = 0;
+        plane.position.set(0, 8, -75);
         makeLines(scene, plane.position);
-        plane.scale.multiplyScalar(10)
+        plane.scale.multiplyScalar(2);
         obstacleController.add(scene, plane.position.clone());
-        console.log(plane);
+
+        plane.add(sound1);
+
+        planeAnimator = new AnimatedObject(plane);
+
+        const animationLoader = new GLTFLoader();
+        animationLoader.setPath('/assets/models/');
+
+        const onLoad = (name, anim, global = false) =>
+            planeAnimator.addAnimation(name, anim, global);
+
+        animationLoader.load('toyPlane.glb', gltf => {
+            onLoad('right', gltf.animations[0]);
+            onLoad('idle', gltf.animations[1], true);
+        });
+
+        // const plan
+
+        // const manager = new THREE.LoadingManager();
+        // manager.onLoad = () => {
+        //     stateMachine.SetState('idle');
+        // };
+        // const onLoadingAnimation = (animName, anim) => {
+        //     const clip = anim.animations[0];
+        //     const action = planeMixer.clipAction(clip);
+
+        //     animations[animName] = {
+        //         clip: clip,
+        //         action: action,
+        //     };
+        // };
+
+        // const loader = new FBXLoader(manager);
+        // loader.setPath('/assets/models/');
+        // loader.load('plane.fbx', a => {
+        //     onLoadingAnimation('idle', a);
+        // });
+
+        //   loader.load('run.fbx', (a) => { _OnLoad('run', a); });
+        //   loader.load('idle.fbx', (a) => { _OnLoad('idle', a); });
+        //   loader.load('dance.fbx', (a) => { _OnLoad('dance', a); });
         make_gui();
     });
 }
 
 function make_tpp() {
     if (!plane) return;
-    const offset = new THREE.Vector3(-6, YPos - 2, -15);
+    const offset = new THREE.Vector3(1, 10, -23);
     offset.applyQuaternion(plane.quaternion);
     offset.add(plane.position);
 
-    const lookAt = new THREE.Vector3(0, 3, 10);
+    const lookAt = new THREE.Vector3(0, 0, 10);
     lookAt.applyQuaternion(plane.quaternion);
     lookAt.add(plane.position);
 
@@ -102,12 +179,19 @@ function make_tpp() {
 }
 
 function animate() {
-    requestAnimationFrame(animate);
-    update();
-    // make_tpp();
-    camera.position.y = Math.max(10, camera.position.y);
-    camera.updateProjectionMatrix();
-    renderer.render(scene, camera);
+    requestAnimationFrame(t => {
+        if (!prevTime) prevTime = t;
+
+        animate();
+        if (planeAnimator) planeAnimator.update((t - prevTime) * 0.001);
+
+        update();
+        make_tpp();
+        camera.position.y = Math.max(10, camera.position.y);
+        camera.updateProjectionMatrix();
+        renderer.render(scene, camera);
+        prevTime = t;
+    });
 }
 
 function move() {
@@ -121,33 +205,36 @@ function move() {
     const speed = 10;
     let sideMovement = 0;
     // let planeGui = 0;
-    if (keyboard.keys[38]) {
+    if (keyboard.keys[KEY_FORWARD]) {
         // velocity += speed;
         velocity.z += speed;
         // camera.position.x += velocity.z;
     }
-    if (keyboard.keys[40]) {
+    if (keyboard.keys[KEY_BACKWARD]) {
         // velocity -= speed;
         velocity.z -= speed;
         // camera.position.x -= velocity.z;
     }
-    if (keyboard.keys[65]) {
+    if (keyboard.keys[KEY_TURN_LEFT]) {
         _A.set(0, 1, 0);
         _Q.setFromAxisAngle(_A, 4.0 * Math.PI * 0.001);
         _R.multiply(_Q);
     }
-    if (keyboard.keys[68]) {
+    if (keyboard.keys[KEY_TURN_RIGHT]) {
         _A.set(0, 1, 0);
         _Q.setFromAxisAngle(_A, -4.0 * Math.PI * 0.001);
         _R.multiply(_Q);
     }
-    if (keyboard.keys[37]) {
+    if (keyboard.keys[KEY_LEFT]) {
         sideMovement = -1;
         velocity.z += speed;
     }
-    if (keyboard.keys[39]) {
+    if (keyboard.keys[KEY_RIGHT]) {
         sideMovement = 1;
         velocity.z += speed;
+        planeAnimator.setState('right');
+    } else {
+        planeAnimator.setState('idle');
     }
 
     controlObject.quaternion.copy(_R);
@@ -164,15 +251,15 @@ function move() {
     sideways.applyQuaternion(controlObject.quaternion);
     sideways.normalize();
 
-    sideways.multiplyScalar(velocity.x * 0.05);
-    forward.multiplyScalar(velocity.z * 0.05);
+    sideways.multiplyScalar(velocity.x * 0.08);
+    forward.multiplyScalar(velocity.z * 0.08);
 
     controlObject.position.add(forward);
     controlObject.position.add(sideways);
 
-    if (keyboard.keys[32]) {
+    if (keyboard.keys[KEY_SHOOT]) {
         if (plane) missileLauncher.add(scene, plane.position, plane.quaternion);
-        keyboard.keys[32] = false;
+        keyboard.keys[KEY_SHOOT] = false;
     }
 
     plane.position.copy(controlObject.position);
@@ -216,6 +303,7 @@ function detectCollisions(objectMesh, colliderMesh) {
 }
 
 function update() {
+    // stateMachine.Update(0.0005, null);
     if (plane) obstacleController.update(plane.position.clone());
     move();
     missileLauncher.move();
@@ -257,10 +345,11 @@ function update() {
 function onWindowResize() {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
-    renderer.render(scene, camera);
+    renderer.setSize(window.innerWidth, window.innerHeight);
 }
 
 init();
 setLight();
 loadGLTF();
 animate();
+window.addEventListener('resize', onWindowResize);
