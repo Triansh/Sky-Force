@@ -3,15 +3,17 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import * as dat from 'dat.gui';
 
-import Floor from './js/Floor';
-import Keyboard from './js/Keyboard';
-import MissileLauncher from './js/MissileLauncher';
 import { AnimatedObject } from './js/FSM';
+import Keyboard from './js/Keyboard';
 
+import Floor from './js/Floor';
 import { makeLines } from './js/makeLines';
 
+import MissileLauncher from './js/MissileLauncher';
 import ObstacleController from './js/ObstacleController';
 import ScoreController from './js/ScoreController';
+import EnemyController from './js/EnemyController';
+
 import {
     KEY_BACKWARD,
     KEY_FORWARD,
@@ -41,11 +43,12 @@ const keyboard = new Keyboard();
 const missileLauncher = new MissileLauncher(scene);
 const obstacleController = new ObstacleController(scene, new THREE.Vector3(0, 8, -75));
 const scoreController = new ScoreController(scene);
+const enemyController = new EnemyController(scene, new THREE.Vector3(0, 8, -75));
 
 let plane;
 let prevTime = null;
 let planeAnimator;
-let playerHealth = 100;
+let playerHealth = 100000;
 let gameOver = false;
 
 // Audio
@@ -65,7 +68,6 @@ const YPos = 8;
 function init() {
     const video = document.getElementById('video');
     const texture = new THREE.VideoTexture(video);
-    //new THREE.TextureLoader().setPath('/assets/images/poly/').load('1.png');
     scene.background = texture;
     scene.fog = new THREE.FogExp2('#ccff', 0.008);
     camera.add(listener);
@@ -84,8 +86,8 @@ function setLight() {
 function setupControls() {
     controls.enablePan = true;
     controls.enableZoom = true;
-    controls.maxDistance = 1000; // Set our max zoom out distance (mouse scroll)
-    controls.minDistance = 10; // Set our min zoom in distance (mouse scroll)
+    controls.maxDistance = 1000;
+    controls.minDistance = 10;
     controls.target.copy(new THREE.Vector3(0, 0, 0));
 }
 
@@ -161,7 +163,6 @@ function animate() {
 }
 
 function move() {
-    if (!plane) return;
     const controlObject = plane;
 
     const _Q = new THREE.Quaternion();
@@ -239,51 +240,84 @@ function detectCollisions(objectMesh, colliderMesh) {
     return false;
 }
 
-function update() {
-    if (plane) obstacleController.update(plane.position.clone());
-    if (plane) missileLauncher.update(plane.position.clone());
-    move();
-    const to_remove_missiles = [];
-    const to_remove_obstacles = [];
-    for (let i = 0; i < missileLauncher.missiles.length; i++) {
-        const missile = missileLauncher.missiles[i];
-        let collided = false;
-        for (let j = 0; j < obstacleController.obstacles.length; j++) {
-            const obs = obstacleController.obstacles[j];
-            if (detectCollisions(missile.object, obs)) {
-                scoreController.addStar(scene, obs.position.clone());
-                scene.remove(missile.object);
-                scene.remove(obs);
-                to_remove_missiles.push(missile);
-                to_remove_obstacles.push(obs);
-                collided = true;
-                break;
-            }
-        }
-    }
-    for (let j = 0; j < obstacleController.obstacles.length; j++) {
-        const obs = obstacleController.obstacles[j];
-        if (detectCollisions(plane, obs)) {
-            to_remove_obstacles.push(obs);
-            scene.remove(obs);
+function checkPlaneObjCollisions(obj, isObs = true) {
+    if (detectCollisions(plane, obj)) {
+        if (isObs) {
             playerHealth = Math.max(0, playerHealth - 20);
             document.querySelector('.health').innerHTML = playerHealth.toString();
         }
+        scene.remove(obj);
+        return true;
     }
-    missileLauncher.remove(to_remove_missiles);
+    return false;
+}
+
+function checkMissileObjCollisions(obj) {
+    const to_remove = [];
+    for (let i = 0; i < missileLauncher.missiles.length; i++) {
+        const ms = missileLauncher.missiles[i];
+        if (detectCollisions(ms.object, obj)) {
+            scene.remove(ms.object);
+            to_remove.push(ms);
+            scene.remove(obj);
+            scoreController.addStar(obj.position.clone());
+        }
+    }
+    missileLauncher.remove(to_remove);
+    return to_remove.length != 0;
+}
+
+function checkCollisions() {
+    const to_remove_obstacles = [];
+    for (let j = 0; j < obstacleController.obstacles.length; j++) {
+        const obs = obstacleController.obstacles[j];
+        if (checkMissileObjCollisions(obs)) to_remove_obstacles.push(obs);
+        else if (checkPlaneObjCollisions(obs)) to_remove_obstacles.push(obs);
+    }
     obstacleController.remove(to_remove_obstacles);
 
-    if (plane) {
-        const to_remove_stars = [];
-        for (let i = 0; i < scoreController.stars.length; i++) {
-            const star = scoreController.stars[i];
-            if (detectCollisions(star, plane)) {
-                scene.remove(star);
-                to_remove_stars.push(star);
-            }
-        }
-        scoreController.remove(to_remove_stars);
+    const to_remove_planes = [];
+    for (let j = 0; j < enemyController.obstacles.length; j++) {
+        const enemy = enemyController.obstacles[j];
+        if (checkMissileObjCollisions(enemy.object)) to_remove_planes.push(enemy);
+        else if (checkPlaneObjCollisions(enemy.object)) to_remove_planes.push(enemy);
     }
+    enemyController.remove(to_remove_planes);
+
+    const to_remove_enemy_missiles = [];
+    for (let j = 0; j < enemyController.missiles.length; j++) {
+        const ms = enemyController.missiles[j];
+        if (checkMissileObjCollisions(ms.object)) to_remove_enemy_missiles.push(ms);
+        else if (checkPlaneObjCollisions(ms.object)) to_remove_enemy_missiles.push(ms);
+    }
+    enemyController.remove_missiles(to_remove_enemy_missiles);
+
+    const to_remove_stars = [];
+    for (let j = 0; j < scoreController.stars.length; j++) {
+        const star = scoreController.stars[j];
+        if (checkPlaneObjCollisions(star, false)) to_remove_stars.push(star);
+    }
+    scoreController.remove(to_remove_stars);
+}
+
+function update() {
+    if (!plane) return;
+
+    obstacleController.update(plane.position.clone());
+    enemyController.update(plane.position.clone());
+    missileLauncher.update(plane.position.clone());
+    move();
+
+    checkCollisions();
+    const to_remove_stars = [];
+    for (let i = 0; i < scoreController.stars.length; i++) {
+        const star = scoreController.stars[i];
+        if (detectCollisions(star, plane)) {
+            scene.remove(star);
+            to_remove_stars.push(star);
+        }
+    }
+    scoreController.remove(to_remove_stars);
 }
 
 function onWindowResize() {

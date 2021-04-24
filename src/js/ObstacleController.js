@@ -6,22 +6,21 @@ class ObstacleController {
         this.obstacles = [];
         this.speed = 0.3;
         this.scene = scene;
-        this.objects = [];
+        this.object = null;
         this.obstacleLoader = new GLTFLoader();
-        this.obstacleLoader.setPath('/assets/models/');
-        this.obstacleLoader.load('airbomb.glb', gltf => {
-            this.objects.push(gltf.scene);
-            this.add(position, 8, gltf.scene);
-        });
-        this.obstacleLoader.load('plane.glb', gltf => {
-            this.objects.push(gltf.scene);
-            this.add(position, 2, gltf.scene);
+        this.load(position);
+    }
+
+    load(position) {
+        this.obstacleLoader.setPath('/assets/models/').load('airbomb.glb', gltf => {
+            this.object = gltf.scene;
+            this.addObstacle(position, 7);
         });
     }
 
-    add(position, count = 12, obj) {
+    addObstacle(position, count = 12) {
         for (let i = 0; i < count; i++) {
-            const ob = obj.clone();
+            const ob = this.object.clone();
             this.scene.add(ob);
             ob.position.copy(this.get_pos(position));
             ob.rotation.set(0, Math.PI, 0);
@@ -30,19 +29,21 @@ class ObstacleController {
         }
     }
 
+    get_random(min, max) {
+        return Math.random() * (max - min) + min;
+    }
+
     get_pos(position) {
-        const factorX = 110;
-        const factorZ = 200;
         const minusX = Math.random() < 0.5;
         const pos = position.clone();
-        pos.x += factorX / 3 + Math.round(Math.random() * factorX);
-        pos.z += factorZ / 3 + Math.round(Math.random() * factorZ);
+        pos.x += this.get_random(100, 150);
+        pos.z += this.get_random(200, 300);
         pos.x = (minusX ? -1 : 1) * pos.x;
         return pos;
     }
 
     update(pos) {
-        const to_remove = [];
+        const rem_obs = [];
         for (let i = 0; i < this.obstacles.length; i++) {
             const position = pos.clone();
             const ob = this.obstacles[i];
@@ -53,19 +54,18 @@ class ObstacleController {
             x.multiplyScalar(this.speed);
             ob.position.add(x);
             if (ob.position.z < pos.z) {
-                to_remove.push(ob);
+                rem_obs.push(ob);
                 this.scene.remove(ob);
             }
         }
-        this.remove(to_remove);
 
-        if (this.obstacles.length < 6 && this.objects[1]) {
-            this.add(pos, 1, this.objects[Math.random() < 0.5 ? 0 : 1]);
+        if (this.obstacles.length < 4 && this.object) {
+            this.addObstacle(pos, 1);
         }
     }
 
-    remove(to_remove) {
-        this.obstacles = this.obstacles.filter(m => !to_remove.includes(m));
+    remove(rem_obs) {
+        this.obstacles = this.obstacles.filter(m => !rem_obs.includes(m));
     }
 }
 
