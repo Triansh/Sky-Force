@@ -38,13 +38,15 @@ const controls = new OrbitControls(camera, renderer.domElement);
 
 // Helper Classes
 const keyboard = new Keyboard();
-const missileLauncher = new MissileLauncher();
-const obstacleController = new ObstacleController();
-const scoreController = new ScoreController();
+const missileLauncher = new MissileLauncher(scene);
+const obstacleController = new ObstacleController(scene, new THREE.Vector3(0, 8, -75));
+const scoreController = new ScoreController(scene);
 
 let plane;
 let prevTime = null;
 let planeAnimator;
+let playerHealth = 100;
+let gameOver = false;
 
 // Audio
 const listener = new THREE.AudioListener();
@@ -61,16 +63,17 @@ audioLoader.load('/assets/audio/plane.mp3', function (buffer) {
 const YPos = 8;
 
 function init() {
-    const cubetexture = new THREE.TextureLoader().setPath('/assets/images/poly/').load('1.png');
-    scene.background = cubetexture;
-    scene.fog = new THREE.FogExp2('#ccff', 0.004);
+    const video = document.getElementById('video');
+    const texture = new THREE.VideoTexture(video);
+    //new THREE.TextureLoader().setPath('/assets/images/poly/').load('1.png');
+    scene.background = texture;
+    scene.fog = new THREE.FogExp2('#ccff', 0.008);
     camera.add(listener);
     camera.position.set(14, 22, -18);
     camera.lookAt(9, YPos, 10);
-    const floor = new Floor(10000, '#336633');
-    scene.add(floor.mesh);
+    // const floor = new Floor();
+    // scene.add(floor.mesh);
     setupControls();
-    obstacleController.add(scene, new THREE.Vector3(0, 8, -75));
 }
 
 function setLight() {
@@ -138,6 +141,13 @@ function animate() {
         if (!prevTime) prevTime = t;
 
         animate();
+
+        if (gameOver) return;
+        if (playerHealth == 0) {
+            gameOver = true;
+            document.getElementById('body').classList.add('over');
+        }
+
         const timeElapsed = (t - prevTime) * 0.001;
         if (planeAnimator) planeAnimator.update(timeElapsed, keyboard.keys);
 
@@ -187,7 +197,9 @@ function move() {
         else if (keyboard.keys[KEY_LEFT]) planeAnimator.setState('left');
     }
 
+    if (!!(_R.w <= 0.8 && _R.w >= -0.8)) return;
     controlObject.quaternion.copy(_R);
+
     const oldPosition = new THREE.Vector3();
     oldPosition.copy(controlObject.position);
 
@@ -207,7 +219,7 @@ function move() {
     plane.position.copy(controlObject.position);
 
     if (keyboard.keys[KEY_SHOOT]) {
-        if (plane) missileLauncher.add(scene, plane.position, plane.quaternion);
+        if (plane) missileLauncher.add(plane.position, plane.quaternion);
         keyboard.keys[KEY_SHOOT] = false;
     }
 }
@@ -229,8 +241,8 @@ function detectCollisions(objectMesh, colliderMesh) {
 
 function update() {
     if (plane) obstacleController.update(plane.position.clone());
+    if (plane) missileLauncher.update(plane.position.clone());
     move();
-    missileLauncher.move();
     const to_remove_missiles = [];
     const to_remove_obstacles = [];
     for (let i = 0; i < missileLauncher.missiles.length; i++) {
@@ -248,7 +260,15 @@ function update() {
                 break;
             }
         }
-        if (!collided) missile.object.position.add(missile.forward);
+    }
+    for (let j = 0; j < obstacleController.obstacles.length; j++) {
+        const obs = obstacleController.obstacles[j];
+        if (detectCollisions(plane, obs)) {
+            to_remove_obstacles.push(obs);
+            scene.remove(obs);
+            playerHealth = Math.max(0, playerHealth - 20);
+            document.querySelector('.health').innerHTML = playerHealth.toString();
+        }
     }
     missileLauncher.remove(to_remove_missiles);
     obstacleController.remove(to_remove_obstacles);
@@ -286,9 +306,10 @@ function make_gui() {
     planeGui.add(plane.position, 'x', -10, 10).listen();
     planeGui.add(plane.position, 'y', -10, 10).listen();
     planeGui.add(plane.position, 'z', -10, 10).listen();
-    planeGui.add(plane.scale, 'x', -10, 10).listen();
-    planeGui.add(plane.scale, 'y', -10, 10).listen();
-    planeGui.add(plane.scale, 'z', -10, 10).listen();
+    planeGui.add(plane.quaternion, 'x', -2.0, 2.0).listen();
+    planeGui.add(plane.quaternion, 'z', -2.0, 2.0).listen();
+    planeGui.add(plane.quaternion, 'w', -2.0, 2.0).listen();
+    planeGui.add(plane.quaternion, 'y', -1.0, 1.0).listen();
     planeGui.open();
 }
 
