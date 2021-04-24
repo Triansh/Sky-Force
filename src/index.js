@@ -23,6 +23,7 @@ import {
     KEY_TURN_LEFT,
     KEY_TURN_RIGHT,
 } from './js/keys';
+import AudioManager from './js/AudioManager';
 
 // Renderer
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -45,42 +46,35 @@ const obstacleController = new ObstacleController(scene, new THREE.Vector3(0, 8,
 const scoreController = new ScoreController(scene);
 const enemyController = new EnemyController(scene, new THREE.Vector3(0, 8, -75));
 
+// Audio
+const audioManager = new AudioManager(camera);
+
 let plane;
 let prevTime = null;
 let planeAnimator;
 let playerHealth = 100000;
 let gameOver = false;
 
-// Audio
-const listener = new THREE.AudioListener();
-const audioLoader = new THREE.AudioLoader();
-const sound1 = new THREE.PositionalAudio(listener);
-audioLoader.load('/assets/audio/plane.mp3', function (buffer) {
-    sound1.setBuffer(buffer);
-    sound1.setRefDistance(20);
-    sound1.setLoop(true);
-    sound1.setVolume(0.4);
-    // sound1.play();
-});
-
-const YPos = 8;
-
 function init() {
     const video = document.getElementById('video');
     const texture = new THREE.VideoTexture(video);
     scene.background = texture;
     scene.fog = new THREE.FogExp2('#ccff', 0.008);
-    camera.add(listener);
+
     camera.position.set(14, 22, -18);
-    camera.lookAt(9, YPos, 10);
+    camera.lookAt(9, 8, 10);
+
     // const floor = new Floor();
     // scene.add(floor.mesh);
+    audioManager.addGlobalAudio('global', 'global.mp3', 0.25);
+    audioManager.addPositionalAudio('explosion', 'explosion.mp3', null, false, 0.5);
+
     setupControls();
 }
 
 function setLight() {
-    let l = new THREE.AmbientLight(0xffffff, 2);
-    scene.add(l);
+    const amb_light = new THREE.AmbientLight(0xffffff, 2);
+    scene.add(amb_light);
 }
 
 function setupControls() {
@@ -100,7 +94,8 @@ function loadGLTF() {
         plane.position.set(0, 8, -75);
         makeLines(scene, plane.position);
         plane.scale.multiplyScalar(2);
-        plane.add(sound1);
+        audioManager.addPositionalAudio('planeNormal', 'planeGlobal.mp3', plane, true);
+        audioManager.addPositionalAudio('missileLaunch', 'missile.mp3', plane, false, 0.4);
 
         planeAnimator = new AnimatedObject(plane);
 
@@ -194,8 +189,11 @@ function move() {
     }
 
     if (planeAnimator) {
-        if (keyboard.keys[KEY_RIGHT]) planeAnimator.setState('right');
-        else if (keyboard.keys[KEY_LEFT]) planeAnimator.setState('left');
+        if (keyboard.keys[KEY_RIGHT]) {
+            planeAnimator.setState('right');
+        } else if (keyboard.keys[KEY_LEFT]) {
+            planeAnimator.setState('left');
+        }
     }
 
     if (!!(_R.w <= 0.8 && _R.w >= -0.8)) return;
@@ -222,6 +220,8 @@ function move() {
     if (keyboard.keys[KEY_SHOOT]) {
         if (plane) missileLauncher.add(plane.position, plane.quaternion);
         keyboard.keys[KEY_SHOOT] = false;
+        audioManager.playSound('missileLaunch');
+        missileLauncher.addSoundInLastTwo(audioManager.getSound('explosion'));
     }
 }
 
@@ -261,6 +261,7 @@ function checkMissileObjCollisions(obj) {
             to_remove.push(ms);
             scene.remove(obj);
             scoreController.addStar(obj.position.clone());
+            audioManager.playSound('explosion');
         }
     }
     missileLauncher.remove(to_remove);

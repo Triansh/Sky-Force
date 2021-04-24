@@ -19,7 +19,7 @@ class MissileLauncher {
             const ms = this.missiles[i].object;
             const fw = this.missiles[i].forward;
             ms.position.add(fw);
-            if (checkdis && ms.position.distanceTo(pos) > 200) {
+            if (checkdis && ms.position.distanceTo(pos) > 150) {
                 to_remove.push(ms);
                 this.scene.remove(ms);
             }
@@ -29,6 +29,12 @@ class MissileLauncher {
 
     remove(to_remove) {
         this.missiles = this.missiles.filter(m => !to_remove.includes(m));
+    }
+
+    addSoundInLastTwo(sound) {
+        const x = this.missiles.length;
+        this.missiles[x - 2].object.add(sound);
+        this.missiles[x - 1].object.add(sound);
     }
 
     add(position, quaternion, oneOnly = false) {
@@ -46,7 +52,7 @@ class MissileLauncher {
         ob.position.add(forward.clone().multiplyScalar(3));
 
         this.scene.add(ob);
-        this.missiles = [...this.missiles, { object: ob, forward }];
+        this.missiles.push({ object: ob, forward });
 
         if (!oneOnly) {
             const side = forward.clone();
@@ -57,7 +63,7 @@ class MissileLauncher {
             const ob2 = ob.clone();
             ob2.position.add(side.multiplyScalar(-2));
             this.scene.add(ob2);
-            this.missiles = [...this.missiles, { object: ob2, forward }];
+            this.missiles.push({ object: ob2, forward });
         }
     }
 }
