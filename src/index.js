@@ -1,13 +1,10 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import * as dat from 'dat.gui';
+// import * as dat from 'dat.gui';
 
 import { AnimatedObject } from './js/FSM';
 import Keyboard from './js/Keyboard';
-
-import Floor from './js/Floor';
-import { makeLines } from './js/makeLines';
 
 import MissileLauncher from './js/MissileLauncher';
 import ObstacleController from './js/ObstacleController';
@@ -52,7 +49,7 @@ const audioManager = new AudioManager(camera);
 let plane;
 let prevTime = null;
 let planeAnimator;
-let playerHealth = 100000;
+let playerHealth = 1000;
 let gameOver = false;
 
 function init() {
@@ -66,7 +63,7 @@ function init() {
 
     // const floor = new Floor();
     // scene.add(floor.mesh);
-    audioManager.addGlobalAudio('global', 'global.mp3', 0.25);
+    audioManager.addGlobalAudio('global', 'global.mp3', 0.4);
     audioManager.addPositionalAudio('explosion', 'explosion.mp3', null, false, 0.5);
 
     setupControls();
@@ -92,10 +89,9 @@ function loadGLTF() {
         plane = gltf.scene;
         scene.add(plane);
         plane.position.set(0, 8, -75);
-        makeLines(scene, plane.position);
         plane.scale.multiplyScalar(2);
         audioManager.addPositionalAudio('planeNormal', 'planeGlobal.mp3', plane, true);
-        audioManager.addPositionalAudio('missileLaunch', 'missile.mp3', plane, false, 0.4);
+        audioManager.addPositionalAudio('missileLaunch', 'missile.mp3', plane, false, 0.3);
 
         planeAnimator = new AnimatedObject(plane);
 
@@ -111,7 +107,7 @@ function loadGLTF() {
             onLoad('idle', gltf.animations[0], true);
             onLoad('propel', gltf.animations[3], true);
         });
-        make_gui();
+        // make_gui();
     });
 }
 
@@ -327,26 +323,26 @@ function onWindowResize() {
     renderer.setSize(window.innerWidth, window.innerHeight);
 }
 
-function make_gui() {
-    const maxi = 200;
-    var gui = new dat.GUI();
+// function make_gui() {
+//     const maxi = 200;
+//     var gui = new dat.GUI();
 
-    var cam = gui.addFolder('Camera');
-    cam.add(camera.position, 'x', -maxi, maxi).listen();
-    cam.add(camera.position, 'y', -maxi, maxi).listen();
-    cam.add(camera.position, 'z', -maxi, maxi).listen();
-    cam.open();
+//     var cam = gui.addFolder('Camera');
+//     cam.add(camera.position, 'x', -maxi, maxi).listen();
+//     cam.add(camera.position, 'y', -maxi, maxi).listen();
+//     cam.add(camera.position, 'z', -maxi, maxi).listen();
+//     cam.open();
 
-    var planeGui = gui.addFolder('Plane');
-    planeGui.add(plane.position, 'x', -10, 10).listen();
-    planeGui.add(plane.position, 'y', -10, 10).listen();
-    planeGui.add(plane.position, 'z', -10, 10).listen();
-    planeGui.add(plane.quaternion, 'x', -2.0, 2.0).listen();
-    planeGui.add(plane.quaternion, 'z', -2.0, 2.0).listen();
-    planeGui.add(plane.quaternion, 'w', -2.0, 2.0).listen();
-    planeGui.add(plane.quaternion, 'y', -1.0, 1.0).listen();
-    planeGui.open();
-}
+//     var planeGui = gui.addFolder('Plane');
+//     planeGui.add(plane.position, 'x', -10, 10).listen();
+//     planeGui.add(plane.position, 'y', -10, 10).listen();
+//     planeGui.add(plane.position, 'z', -10, 10).listen();
+//     planeGui.add(plane.quaternion, 'x', -2.0, 2.0).listen();
+//     planeGui.add(plane.quaternion, 'z', -2.0, 2.0).listen();
+//     planeGui.add(plane.quaternion, 'w', -2.0, 2.0).listen();
+//     planeGui.add(plane.quaternion, 'y', -1.0, 1.0).listen();
+//     planeGui.open();
+// }
 
 init();
 setLight();

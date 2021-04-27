@@ -4,7 +4,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
 class MissileLauncher {
     constructor(scene) {
         this.missiles = []; // {object: '', forward}
-        this.speed = 1.4;
+        this.speed = 1.5;
         this.missileLoader = new GLTFLoader();
         this.scene = scene;
         this.object = null;

@@ -1,4 +1,3 @@
-import * as THREE from 'three';
 import MissileLauncher from './MissileLauncher';
 import ObstacleController from './ObstacleController';
 
